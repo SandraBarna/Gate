@@ -121,11 +121,12 @@ protected:
   double edepByEvent;
   bool newEvent;
   double effectiveChord;
+  double effectiveChordTemp;
   
   GateActorMessenger* pMessenger;
   
   G4EmCalculator * emcalc;
-
+  G4Material * myMaterial;
 
 };
 

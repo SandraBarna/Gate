@@ -77,7 +77,7 @@ void GateTEPCActor::Construct()
   if (!mSetMaterial.empty()){
 	  mSetMaterialBool = true;
     G4cout << "Build material: " << mSetMaterial << G4endl;
-	G4NistManager::Instance()->FindOrBuildMaterial(mSetMaterial);
+	myMaterial = G4NistManager::Instance()->FindOrBuildMaterial(mSetMaterial);
 	
     mSaveFilename= removeExtension(mSaveFilename) + "-letTo" + mSetMaterial + "."+ getExtension(mSaveFilename);
   }
@@ -116,41 +116,48 @@ void GateTEPCActor::Construct()
   G4String str1 = mVolume->GetLogicalVolume()->GetSolid()->GetEntityType();
   G4cout<<"=========================== get entity type "<< str1 <<G4endl;
   // G4cout<<"=========================== get entity type "<<mVolume->GetLogicalVolume()->GetSolid()->GetSphereRmax()<<G4endl;
+  G4double matDensity = GetVolume()->GetMaterial()->GetDensity() / (g/cm3);
   if (str1.compare("G4Sphere") == 0){
-		effectiveChord = (2.0 / 3.0) * 2.0 * ((GateSphere *)GetVolume())->GetSphereRmax()  * GetVolume()->GetMaterial()->GetDensity() / (g/cm3); // tested by A.Resch 29thOct2020: works and is correct
-		G4cout<<"Effective chord length mm: " << effectiveChord<<G4endl;
-		G4cout<<"Effective chord length um: "<< (effectiveChord / um)<<G4endl;
+		effectiveChord = (2.0 / 3.0) * 2.0 * ((GateSphere *)GetVolume())->GetSphereRmax()  ; // tested by A.Resch 29thOct2020: works and is correct
+		G4cout<<"Effective chord length mm: " << effectiveChord*matDensity<<G4endl;
+		G4cout<<"Effective chord length um: "<< (effectiveChord*matDensity / um)<<G4endl;
 		G4cout<<"Radius Sphere: " << ((GateSphere *)GetVolume())->GetSphereRmax()<<G4endl;
 		G4cout<<"Density: " << GetVolume()->GetMaterial()->GetDensity() / (g/cm3)<<G4endl;
 		G4cout<<"==========================="<<mVolume->GetObjectName()<<G4endl;
 		//G4cout<<"=========================== get entity type "<<mVolume->GetLogicalVolume()->GetSolid()->GetEntityType()<<G4endl; //<< GetEntityType()
   } 
   if (str1.compare("G4Tubs") == 0){
-		effectiveChord = (3.14159265 / 4.0) * 2.0 * ((GateCylinder *)GetVolume())->GetCylinderRmax()  * GetVolume()->GetMaterial()->GetDensity() / (g/cm3);
-		G4cout<<"Effective chord length mm: " << effectiveChord<<G4endl;
-		G4cout<<"Effective chord length um: "<< (effectiveChord / um)<<G4endl;
+		effectiveChord = (3.14159265 / 4.0) * 2.0 * ((GateCylinder *)GetVolume())->GetCylinderRmax()  ;
+		G4cout<<"Effective chord length mm: " << effectiveChord*matDensity<<G4endl;
+		G4cout<<"Effective chord length um: "<< (effectiveChord*matDensity / um)<<G4endl;
 		G4cout<<"Radius Cylinder: " << ((GateCylinder *)GetVolume())->GetCylinderRmax()<<G4endl;
 		G4cout<<"Density: " << GetVolume()->GetMaterial()->GetDensity() / (g/cm3)<<G4endl;
 		G4cout<<"==========================="<<mVolume->GetObjectName()<<G4endl;
   }
-  if (str1.compare("G4Box") == 0){
+  if (str1.compare("G4Box") == 0){ 
 		if (mSourceDirTEPC.compare("x") == 0){
-			effectiveChord = 2.0 * ((GateBox *)GetVolume())-> GetBoxXHalfLength() * GetVolume()->GetMaterial()->GetDensity() / (g/cm3); 
+			effectiveChord = 2.0 * ((GateBox *)GetVolume())-> GetBoxXHalfLength(); 
 			G4cout<<"Thickness Slab: " << 2 * ((GateBox *)GetVolume())-> GetBoxXHalfLength()<<G4endl;
 		} else if (mSourceDirTEPC.compare("y") == 0){
-			effectiveChord = 2.0 * ((GateBox *)GetVolume())-> GetBoxYHalfLength() * GetVolume()->GetMaterial()->GetDensity() / (g/cm3); 
+			effectiveChord = 2.0 * ((GateBox *)GetVolume())-> GetBoxYHalfLength(); 
 			G4cout<<"Thickness Slab: " << 2 * ((GateBox *)GetVolume())-> GetBoxYHalfLength()<<G4endl;
 		} else if (mSourceDirTEPC.compare("z") == 0){
-			effectiveChord = 2.0 * ((GateBox *)GetVolume())-> GetBoxZHalfLength() * GetVolume()->GetMaterial()->GetDensity() / (g/cm3); 
+			effectiveChord = 2.0 * ((GateBox *)GetVolume())-> GetBoxZHalfLength(); 
 			G4cout<<"Thickness Slab: " << 2 * ((GateBox *)GetVolume())-> GetBoxZHalfLength()<<G4endl;
 		}
 		G4cout<<"Beam Direction: "<< mSourceDirTEPC<<G4endl;
-		G4cout<<"Effective chord length mm: " << effectiveChord<<G4endl;
-		G4cout<<"Effective chord length um: "<< (effectiveChord / um)<<G4endl;
+		G4cout<<"Effective chord length mm: " << effectiveChord*matDensity<<G4endl;
+		G4cout<<"Effective chord length um: "<< (effectiveChord*matDensity / um)<<G4endl;
 		G4cout<<"Density: " << GetVolume()->GetMaterial()->GetDensity() / (g/cm3)<<G4endl;
 		G4cout<<"==========================="<<mVolume->GetObjectName()<<G4endl;
   }
-
+  effectiveChordTemp = effectiveChord * matDensity;
+  if (mSetMaterialBool){
+	matDensity = (myMaterial->GetDensity() / (g/cm3)) ;
+  }
+  effectiveChord *= matDensity;
+  G4cout<<"Effective chord length Other Mat mm: " << effectiveChord<<G4endl;
+  G4cout<<"Effective chord length mm: " << effectiveChordTemp<<G4endl;
 }
 //-----------------------------------------------------------------------------
 
@@ -300,13 +307,17 @@ void GateTEPCActor::UserSteppingAction(const GateVVolume *, const G4Step *step)
 	G4double dedx = emcalc->ComputeElectronicDEDX(energy, partname, material);
 	G4double SPR_ToOtherMaterial =1.0;
     G4double dedx_OtherMaterial = emcalc->ComputeElectronicDEDX(energy, partname->GetParticleName(), mSetMaterial) ;   
-    //G4cout<<"part name: "<<partname->GetParticleName()<< G4endl<< G4endl;
+    //G4cout<<"part name: "<<partname->GetParticleName()<<  G4endl;
+    //G4cout<<"dedx : "<<dedx<<  G4endl;
+    //G4cout<<"dedx OtherMater : "<<dedx_OtherMaterial<< G4endl;
+    //G4cout<<"y : "<<edep/effectiveChordTemp<< G4endl;
     if ((dedx > 0) && (dedx_OtherMaterial >0 ))
     {
         SPR_ToOtherMaterial = dedx_OtherMaterial/dedx;
         edep *=SPR_ToOtherMaterial;
         //dedx *=SPR_ToOtherMaterial;
     }
+    //G4cout<<"y_other mat : "<<edep/effectiveChord<< G4endl<< G4endl;
   }
     edepByEvent += edep ; //step->GetTotalEnergyDeposit();
 }
